@@ -50,12 +50,13 @@ Each JSON item must contain:
 
 The Linux server environment definition is in `environment.linux.4090.yml`.
 
-Create the environment and then install the spaCy model used by the default config:
+Create the environment and then install the spaCy model used by the default config.
+The `spacy download` helper can fail in some mirrored or proxied environments, so use the official model wheel directly:
 
 ```bash
 conda env create -f environment.linux.4090.yml
 conda activate vlt-linux-4090
-python -m spacy download en_core_web_lg
+python -m pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.7.1/en_core_web_lg-3.7.1-py3-none-any.whl
 ```
 
 ## External assets
