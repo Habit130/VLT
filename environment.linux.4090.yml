@@ -1,0 +1,22 @@
+name: vlt-linux-4090
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - numpy=1.26
+  - matplotlib=3.8
+  - scikit-image=0.22
+  - h5py=3.10
+  - pip:
+      - tensorflow==2.15.1
+      - keras==2.15.0
+      - opencv-python-headless==4.9.0.80
+      - progressbar2==4.4.2
+      - pycocotools==2.0.7
+      - spacy==3.7.4
+      - yacs==0.1.8
+      - keras-transformer
+      - keras-multi-head
+      - keras-pos-embd

@@ -1,10 +1,8 @@
-# from keras.layers import Conv2D, Add, ZeroPadding2D, ReLU, UpSampling2D, Flatten, Concatenate, MaxPooling2D, Multiply, Input, Lambda, Dense, Dropout, Dot, Reshape, Activation, GlobalAveragePooling2D, AveragePooling2D
 from functools import reduce
-from keras.layers import Conv2D, Add, ZeroPadding2D, ReLU
-from keras.layers.advanced_activations import LeakyReLU
-from keras.layers.normalization import BatchNormalization
-from keras.regularizers import l2
 from functools import wraps
+
+from keras.layers import Add, BatchNormalization, Conv2D, LeakyReLU, ReLU, ZeroPadding2D
+from keras.regularizers import l2
 
 
 def compose(*funcs):
@@ -35,7 +33,7 @@ def DarknetConv2D_BN_Leaky(*args, **kwargs):
     return compose(
         DarknetConv2D(*args, **no_bias_kwargs),
         BatchNormalization(),
-        LeakyReLU(alpha=0.1))
+        LeakyReLU(negative_slope=0.1))
 
 
 def VGGnetConv2D(*args, **kwargs):

@@ -1,5 +1,5 @@
-import keras.backend as K
 import tensorflow as tf
+from keras import backend as K
 
 
 def expand_and_tile(x, outsize):

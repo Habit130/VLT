@@ -1,0 +1,15 @@
+train_set: ../dataset/train.json
+evaluate_set: ../dataset/test.json
+dataset_root: ../dataset
+
+pretrained_weights: ./weights/yolov3_480000.h5
+resume_model: ''
+log_path: ./log/local_dataset
+evaluate_model: ./log/local_dataset_example/models/final.weights.h5
+
+caption_index: 2
+word_embed: en_core_web_lg
+word_len: 32
+
+batch_size: 16
+workers: 4

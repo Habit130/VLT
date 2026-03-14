@@ -23,14 +23,14 @@ def simple_fusion(F_v, f_q, dim=1024):
     F_v_proj = V.darknet_resblock(F_v, dim//2)
     # fq_project
     f_q_proj = L.Dense(dim, activation='linear')(f_q)
-    f_q_proj = L.advanced_activations.LeakyReLU(alpha=0.1)(
-        L.normalization.BatchNormalization()(f_q_proj)
+    f_q_proj = L.LeakyReLU(negative_slope=0.1)(
+        L.BatchNormalization()(f_q_proj)
         )
     f_q_proj = L.Lambda(utils.expand_and_tile, arguments={'outsize': out_size})(f_q_proj)
     # simple elemwise multipy
     F_m = L.Multiply()([F_v_proj, f_q_proj])
-    F_m = L.advanced_activations.LeakyReLU(alpha=0.1)(
-        L.normalization.BatchNormalization()(F_m)
+    F_m = L.LeakyReLU(negative_slope=0.1)(
+        L.BatchNormalization()(F_m)
         )
     return F_m
 
@@ -181,6 +181,6 @@ def yolo_loss(args,
     loss += mask_loss
 
     if print_loss:
-        loss = tf.Print(loss, ['mask: ', mask_loss])
+        loss = tf.compat.v1.Print(loss, ['mask: ', mask_loss])
 
     return K.expand_dims(loss, axis=0)

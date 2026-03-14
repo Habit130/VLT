@@ -1,11 +1,10 @@
 import tensorflow as tf
-from keras.layers.recurrent import GRU
-from keras.layers import Bidirectional, Dense, Lambda, Masking, Dropout, Multiply
 import keras.backend as K
+from keras.layers import GRU, Bidirectional, Dense, Dropout, Lambda, Masking, Multiply
 
 
 def gru_rnn_module_a(word_embs, rnn_dim, dropout, return_seq):
-    with tf.variable_scope('gru_module'):
+    with tf.compat.v1.variable_scope('gru_module'):
         if dropout > 0.:
             lstm_cell = Bidirectional(GRU(rnn_dim, return_sequences=return_seq, dropout=dropout), merge_mode="sum")(word_embs)
         else:
@@ -14,7 +13,7 @@ def gru_rnn_module_a(word_embs, rnn_dim, dropout, return_seq):
 
 
 def gru_rnn_module_s(word_embs, rnn_dim, dropout, return_seq):
-    with tf.variable_scope('gru_module'):
+    with tf.compat.v1.variable_scope('gru_module'):
         if dropout > 0.:
             lstm_cell = GRU(rnn_dim, dropout=dropout, return_sequences=return_seq)(word_embs)
         else:

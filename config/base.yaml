@@ -1,22 +1,28 @@
 ---
-#path
-train_set: ./data/anns/refcoco/train.txt
-evaluate_set: ./data/anns/refcoco/val.txt
-seg_gt_path: ./data/masks/refcoco
-image_path: ./data/images/train2014
-pretrained_weights: ./data/weights/yolov3_480000.h5
-log_path: ./log/refcoco
-evaluate_model: ./log/refcoco_gpu_all/models/best_map.h5
+# dataset
+dataset_root: ../dataset
+train_set: ../dataset/train.json
+evaluate_set: ../dataset/test.json
+pretrained_weights: ./weights/yolov3_480000.h5
+resume_model: ''
+log_path: ./log/local_json
+evaluate_model: ./log/local_json_example/models/final.weights.h5
 
 seed: 10010
 
-#model
+# dataset/text
+caption_index: 2
+word_embed: en_core_web_lg
+word_len: 32
+embed_dim: 300
+
+# model
 input_size: 416
 seg_out_stride: 2
 free_body: 1
 hidden_dim: 256
 
-#train
+# train
 batch_size: 24
 lr_scheduler: step
 lr: 0.001
@@ -26,22 +32,17 @@ start_epoch: 0
 workers: 8
 max_queue_size: 10
 
-#lang
-word_embed: en_vectors_web_lg
-word_len: 15
-embed_dim: 300
+# language
 lang_att: True
 jemb_dim: 1024
 rnn_bidirectional: True
 rnn_hidden_size: 1024
 rnn_drop_out: 0.1
 
-#eval
+# test
 segment_thresh: 0.35
-log_images: 0
-multi_thres: false
 
-#transformer
+# transformer
 transformer_hidden_dim: 256
 transformer_encoder_num: 2
 transformer_decoder_num: 2
@@ -49,5 +50,4 @@ transformer_head_num: 8
 
 num_query: 32
 query_balance: True
-
 ...

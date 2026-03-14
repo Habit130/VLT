@@ -1,73 +1,143 @@
-# [Vision-Language Transformer and Query Generation for Referring Segmentation](https://arxiv.org/abs/2108.05565)
+# Vision-Language Transformer for Local JSON Referring Segmentation
 
-Please consider citing our paper in your publications if the project helps your research.
+This repository is adapted for Linux server training and testing on a single RTX 4090 with a local JSON dataset. The original RefCOCO data preparation scripts are kept in the repository for reference, but they are no longer part of the supported workflow.
+
+## Supported workflow
+
+- Train with `vlt.py train <config>`
+- Test with `vlt.py test <config>`
+- Read data from sibling `../dataset/train.json` and `../dataset/test.json`
+- Use one caption per sample, defaulting to `caption[2]`
+- Treat every non-zero mask pixel as foreground
+- Report only `iou`, `dice`, `recall`, `miou`, `macc` on the held-out test split
+
+## Expected dataset layout
+
+The repository is expected to sit beside the dataset directory:
+
+```text
+Segmentation/
+  VLT/
+  dataset/
+    train.json
+    test.json
+    train/
+      img/
+      lbl/
+    test/
+      img/
+      lbl/
 ```
-@inproceedings{vision-language-transformer,
-  title={Vision-Language Transformer and Query Generation for Referring Segmentation},
-  author={Ding, Henghui and Liu, Chang and Wang, Suchen and Jiang, Xudong},
-  booktitle={Proceedings of the IEEE International Conference on Computer Vision},
-  year={2021}
+
+Each JSON item must contain:
+
+```json
+{
+  "id": "sample_id",
+  "image": "train/img/example.jpg",
+  "mask": "train/lbl/example.png",
+  "caption": [
+    "short expression",
+    "alternate expression",
+    "default expression used by this repo"
+  ]
 }
 ```
 
-## Introduction
+`image` and `mask` may also be absolute paths.
 
-Vision-Language Transformer (VLT) is a framework for referring segmentation task. Our method produces multiple query vector for one input language expression, and use each of them to “query” the input image, generating a set of responses. Then the network selectively aggregates these responses, in which queries that provide better comprehensions are spotlighted.
+## Environment
 
-<p align="center">
-<img src="fig0.png" width="500px">
-</p>
+The Linux server environment definition is in `environment.linux.4090.yml`.
 
-## Installation
+Create the environment and then install the spaCy model used by the default config:
 
-1. Environment:
+```bash
+conda env create -f environment.linux.4090.yml
+conda activate vlt-linux-4090
+python -m spacy download en_core_web_lg
+```
 
-   - Python 3.6
-   - tensorflow 1.15
-   - Other dependencies in `requirements.txt`
-   - SpaCy model for embedding: 
-      
-      ```python -m spacy download en_vectors_web_lg```
+## External assets
 
-2. Dataset preparation
+This repository does not track runtime assets in Git.
 
-   - Put the folder of COCO training set ("`train2014`") under `data/images/`.
+- Dataset: provide `../dataset`
+- YOLO backbone initialization weights: place them under `./weights/` and point `pretrained_weights` at the actual file
+- Training outputs: created under `log_path`
 
-   - Download the RefCOCO dataset from [here](https://github.com/lichengunc/refer) and extract them to `data/`. Then run the script for data preparation under `data/`:
-   
-      ```
-      cd data
-      python data_process_v2.py --data_root . --output_dir data_v2 --dataset [refcoco/refcoco+/refcocog] --split [unc/umd/google] --generate_mask
-      ```
+The default config expects `./weights/yolov3_480000.h5`. Training will fail fast if it is missing.
 
-## Evaluating
+## Configuration
 
-1. Download pretrained models & config files from [here](https://entuedu-my.sharepoint.com/:f:/g/personal/liuc0058_e_ntu_edu_sg/EpE88e5DW1NEl6p7sKlMvrcBhBLeMTuHbtNKDiJCvhQBtQ?e=6thFDa).
+The default server-oriented config is `config/base.yaml`.
 
-2. In the config file, set: 
+Key fields:
 
-   - `evaluate_model`: path to the pretrained weights
-   - `evaluate_set`: path to the dataset for evaluation.
+- `dataset_root`: sibling dataset directory, default `../dataset`
+- `train_set`: training JSON file
+- `evaluate_set`: held-out test JSON file
+- `caption_index`: default `2`, interpreted as a 0-based index
+- `word_embed`: default `en_core_web_lg`
+- `word_len`: default `32`
+- `segment_thresh`: prediction threshold used during testing, default `0.35`
+- `pretrained_weights`: backbone init weights for training
+- `resume_model`: optional full-model training checkpoint for resume
+- `evaluate_model`: checkpoint to test
 
-3. Run
-   ```
-   python vlt.py test [PATH_TO_CONFIG_FILE]
-   ```
+An example config for the local dataset is provided at `config/local_dataset/example.yaml`.
 
 ## Training
 
-1. Pretrained Backbones:
-   We use the backbone weights proviede by [MCN](https://github.com/luogen1996/MCN/blob/master/data/README.md).
+Training preserves the original model and learning-rate schedule, with the original default `50` epochs and step decay at `40`, `45`, `50`.
 
-   *Note*: we use the backbone that ***excludes*** all images that appears in the val/test splits of RefCOCO, RefCOCO+ and RefCOCOg.
+Training no longer runs validation after each epoch. Instead it writes:
 
-2. Specify hyperparameters, dataset path and pretrained weight path in the configuration file. Please refer to the examples under `/config`, or config file of our pretrained models.
+- `log_path_<config_name>/models/last.weights.h5`
+- `log_path_<config_name>/models/final.weights.h5`
 
-3. Run
-   ```
-   python vlt.py train [PATH_TO_CONFIG_FILE]
-   ```
+Start training with:
 
-## Acknowledgement
+```bash
+python vlt.py train config/local_dataset/example.yaml
+```
 
-We borrowed a lot of codes from [MCN](https://github.com/luogen1996/MCN), [keras-transformer](https://github.com/CyberZHG/keras-transformer), [RefCOCO API](https://github.com/lichengunc/refer) and [keras-yolo3](https://github.com/qqwweee/keras-yolo3). Thanks for their excellent works!
+If you want to resume training, set `resume_model` in the config to a previous `last.weights.h5` or compatible full-model checkpoint.
+
+## Testing
+
+Testing uses the held-out JSON split specified by `evaluate_set`. It accumulates global pixel-level:
+
+- TP
+- FP
+- FN
+- TN
+
+and then reports:
+
+- `iou`
+- `dice`
+- `recall`
+- `miou`
+- `macc`
+
+If any metric denominator is zero, that metric is recorded as `0`.
+
+Run testing with:
+
+```bash
+python vlt.py test config/local_dataset/example.yaml
+```
+
+The config should point `evaluate_model` at the checkpoint you want to test, typically `final.weights.h5`.
+
+Results are written to:
+
+- `result/test_metrics.json`
+- `result/test_metrics.txt`
+
+## Notes
+
+- The project is now Linux-server-first. Windows local execution is not a supported target.
+- The old RefCOCO preparation path under `data/` is retained only as legacy reference.
+- The current implementation keeps the repository entry points and YACS config flow intact while adapting the dataset and test logic to the local JSON task.

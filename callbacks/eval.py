@@ -1,156 +1,138 @@
-import keras
-import numpy as np
-from loader.loader import get_random_data
+import json
+import os
+
 import cv2
-import keras.backend as K
-from matplotlib.pyplot import cm
-import spacy
+import numpy as np
 import progressbar
+import spacy
+
+from loader.loader import get_random_data
 
 
-class Evaluate(keras.callbacks.Callback):
-    """ Evaluation callback for arbitrary datasets.
-    """
+class Evaluate(object):
+    """Standalone evaluator for held-out testing on the local JSON dataset."""
 
-    def __init__(
-        self,
-        data,
-        config,
-        tensorboard=None,
-        verbose=1,
-        phase='train'
-    ):
-        self.val_data = data
-        self.tensorboard = tensorboard
-        self.verbose = verbose
-        self.vis_id = [i for i in np.random.randint(0, len(data), 200)]
-        self.batch_size = max(config.batch_size//2, 1)
-        self.colors = np.array(cm.hsv(np.linspace(0, 1, 10)).tolist()) * 255
-        self.input_shape = (config.input_size, config.input_size)  # multiple of 32, hw
+    def __init__(self, model, data, config, verbose=1):
+        self.model = model
+        self.data = data
         self.config = config
+        self.verbose = verbose
+        self.batch_size = max(config.batch_size // 2, 1)
+        self.input_shape = (config.input_size, config.input_size)
         self.word_embed = spacy.load(config.word_embed)
-        self.word_len = config.word_len
-        self.seg_min_overlap = config.segment_thresh
-        if phase == 'test':
-            self.log_images = config.log_images
-            self.multi_thres = config.multi_thres
-        else:
-            self.log_images = 0
-            self.multi_thres = False
-        self.input_image_shape = K.placeholder(shape=(2,))
-        self.sess = K.get_session()
-        self.eval_save_images_id = [i for i in np.random.randint(0, len(self.val_data), 200)]
-        super(Evaluate, self).__init__()
-
-    def on_epoch_end(self, epoch, logs=None):
-        if logs is None:
-            logs = {}
-
-        # run evaluation
-        self.seg_iou, self.seg_prec = self.evaluate()
-
-        if self.tensorboard is not None and self.tensorboard.writer is not None:
-            import tensorflow as tf
-            summary = tf.Summary()
-            summary_value = summary.value.add()
-            summary_value.simple_value = self.seg_iou
-            summary_value.tag = "seg_iou"
-            for item in self.seg_prec:
-                summary_value = summary.value.add()
-                summary_value.simple_value = self.seg_prec[item]
-                summary_value.tag = "map@%.2f" % item
-            self.tensorboard.writer.add_summary(summary, epoch)
-
-        logs['seg_iou'] = self.seg_iou
-        logs['seg_prec'] = self.seg_prec
-
-        if self.verbose == 1:
-            print('seg_iou: {:.4f}'.format(self.seg_iou))
+        self.threshold = config.segment_thresh
 
     def evaluate(self):
-        prec_all = dict()
-        img_id = 0
-        iou_all = 0.
+        counts = {"tp": 0, "fp": 0, "fn": 0, "tn": 0}
+        iterator = range(0, len(self.data), self.batch_size)
+        iterator = progressbar.progressbar(iterator, prefix="evaluation: ")
 
-        test_batch_size = self.batch_size
-        for start in progressbar.progressbar(range(0, len(self.val_data), test_batch_size), prefix='evaluation: '):
-            end = start + test_batch_size
-            batch_data = self.val_data[start:end]
+        for start in iterator:
+            batch = self.data[start:start + self.batch_size]
             images = []
-            images_ori = []
-            files_id = []
             word_vecs = []
-            sentences = []
-            gt_segs = []
+            gt_masks = []
 
-            for data in batch_data:
-                image_data, word_vec, image, sentence, seg_map = get_random_data(data, self.input_shape,
-                                                                                 self.word_embed, self.config,
-                                                                                 train_mode=False)  # box is [1,5]
-                sentences.extend(sentence)
-                word_vecs.extend(word_vec)
-                # evaluate each sentence corresponding to the same image
-                for ___ in range(len(sentence)):
-                    images.append(image_data)
-                    images_ori.append(image)
-                    files_id.append(img_id)
-                    gt_segs.append(seg_map)
-                    img_id += 1
+            for sample in batch:
+                image_data, word_vec, _, _, gt_mask = get_random_data(
+                    sample,
+                    self.input_shape,
+                    self.word_embed,
+                    self.config,
+                    train_mode=False,
+                )
+                images.append(image_data)
+                word_vecs.append(word_vec)
+                gt_masks.append(gt_mask)
 
-            images = np.array(images)
-            word_vecs = np.array(word_vecs)
-            mask_outs = self.model.predict_on_batch([images, word_vecs])
-            mask_outs = self.sigmoid_(mask_outs)  # logit to sigmoid
-            batch_size = mask_outs.shape[0]
-            for i in range(batch_size):
-                ih = gt_segs[i].shape[0]
-                iw = gt_segs[i].shape[1]
-                w, h = self.input_shape
-                scale = min(w / iw, h / ih)
-                nw = int(iw * scale)
-                nh = int(ih * scale)
-                dx = (w - nw) // 2
-                dy = (h - nh) // 2
+            preds = self.model.predict_on_batch([np.array(images), np.array(word_vecs)])
+            probs = self.sigmoid(preds)
 
-                pred_seg = mask_outs[i, :, :, 0]
+            for pred, gt_mask in zip(probs, gt_masks):
+                pred_mask = self.restore_prediction(pred[:, :, 0], gt_mask.shape[:2])
+                pred_bin = pred_mask > self.threshold
+                gt_bin = gt_mask[:, :, 0] > 0
 
-                pred_seg = cv2.resize(pred_seg, self.input_shape)
-                pred_seg = pred_seg[dy:nh + dy, dx:nw + dx, ...]
-                pred_seg = cv2.resize(pred_seg, (gt_segs[i].shape[1], gt_segs[i].shape[0]))
-                pred_seg = np.reshape(pred_seg, [pred_seg.shape[0], pred_seg.shape[1], 1])
+                counts["tp"] += int(np.logical_and(pred_bin, gt_bin).sum())
+                counts["fp"] += int(np.logical_and(pred_bin, np.logical_not(gt_bin)).sum())
+                counts["fn"] += int(np.logical_and(np.logical_not(pred_bin), gt_bin).sum())
+                counts["tn"] += int(np.logical_and(np.logical_not(pred_bin), np.logical_not(gt_bin)).sum())
 
-                # segmentation eval
-                iou, prec = self.cal_seg_iou(gt_segs[i], pred_seg, self.seg_min_overlap)
-                iou_all += iou
-                for item in prec:
-                    if prec_all.get(item):
-                        prec_all[item] += prec[item]
-                    else:
-                        prec_all[item] = prec[item]
+        metrics = self.compute_metrics(counts)
+        if self.verbose:
+            print(json.dumps(metrics, indent=2))
+        return metrics
 
-                if self.log_images:
-                    sent = sentences[i]['sent']
-                    cv2.imwrite('log/out_img/'+str(files_id[i])+'_'+sent+'_pred.png', pred_seg * 255)
-                    cv2.imwrite('log/out_img/'+str(files_id[i])+'_'+sent+'_gt.png', gt_segs[i])
-                    cv2.imwrite('log/out_img/'+str(files_id[i])+'_'+sent+'_img.png', images[i][dy:nh + dy, dx:nw + dx, ...] * 255)
+    def restore_prediction(self, pred_seg, gt_shape):
+        gh, gw = gt_shape
+        h, w = self.input_shape
 
-        pred_seg = iou_all / img_id
-        for item in prec_all:
-            prec_all[item] /= img_id
-        return pred_seg, prec_all
+        scale = min(w / gw, h / gh)
+        nw = int(gw * scale)
+        nh = int(gh * scale)
+        dx = (w - nw) // 2
+        dy = (h - nh) // 2
 
-    def cal_seg_iou(self, gt, pred, thresh=0.5):
-        t = np.array(pred > thresh)
-        p = gt > 0.
-        intersection = np.logical_and(t, p)
-        union = np.logical_or(t, p)
-        iou = (np.sum(intersection > 0) + 1e-10) / (np.sum(union > 0) + 1e-10)
+        pred_seg = cv2.resize(pred_seg, (w, h), interpolation=cv2.INTER_LINEAR)
+        pred_seg = pred_seg[dy:dy + nh, dx:dx + nw]
+        if pred_seg.size == 0:
+            return np.zeros((gh, gw), dtype=np.float32)
+        pred_seg = cv2.resize(pred_seg, (gw, gh), interpolation=cv2.INTER_LINEAR)
+        return pred_seg
 
-        prec = dict()
-        thresholds = np.arange(0.5, 1, 0.05)
-        for thresh in thresholds:
-            prec[thresh] = float(iou > thresh)
-        return iou, prec
+    def compute_metrics(self, counts):
+        tp = counts["tp"]
+        fp = counts["fp"]
+        fn = counts["fn"]
+        tn = counts["tn"]
 
-    def sigmoid_(self, x):
-        return (1. + 1e-9) / (1. + np.exp(-x) + 1e-9)
+        iou = self.safe_div(tp, tp + fp + fn)
+        dice = self.safe_div(2 * tp, 2 * tp + fp + fn)
+        recall = self.safe_div(tp, tp + fn)
+        iou_bg = self.safe_div(tn, tn + fn + fp)
+        miou = (iou + iou_bg) / 2.0
+        acc_fg = self.safe_div(tp, tp + fn)
+        acc_bg = self.safe_div(tn, tn + fp)
+        macc = (acc_fg + acc_bg) / 2.0
+
+        return {
+            "iou": iou,
+            "dice": dice,
+            "recall": recall,
+            "miou": miou,
+            "macc": macc,
+            "tp": tp,
+            "fp": fp,
+            "fn": fn,
+            "tn": tn,
+        }
+
+    def save(self, metrics, result_dir, checkpoint_path, dataset_path):
+        if not os.path.exists(result_dir):
+            os.makedirs(result_dir)
+
+        payload = dict(metrics)
+        payload["checkpoint"] = checkpoint_path
+        payload["dataset"] = dataset_path
+
+        json_path = os.path.join(result_dir, "test_metrics.json")
+        txt_path = os.path.join(result_dir, "test_metrics.txt")
+
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2)
+
+        with open(txt_path, "w", encoding="utf-8") as f:
+            for key in ["iou", "dice", "recall", "miou", "macc"]:
+                f.write("{}: {:.6f}\n".format(key, metrics[key]))
+
+        return json_path, txt_path
+
+    @staticmethod
+    def safe_div(num, denom):
+        if denom == 0:
+            return 0.0
+        return float(num) / float(denom)
+
+    @staticmethod
+    def sigmoid(x):
+        return 1.0 / (1.0 + np.exp(-x))

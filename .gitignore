@@ -131,6 +131,8 @@ dmypy.json
 data/images
 data/weights
 data/data_v2
+weights/
+external_weights/
 
 log/
 .vscode
