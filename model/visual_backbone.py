@@ -33,7 +33,7 @@ def DarknetConv2D_BN_Leaky(*args, **kwargs):
     return compose(
         DarknetConv2D(*args, **no_bias_kwargs),
         BatchNormalization(),
-        LeakyReLU(negative_slope=0.1))
+        LeakyReLU(alpha=0.1))
 
 
 def VGGnetConv2D(*args, **kwargs):
