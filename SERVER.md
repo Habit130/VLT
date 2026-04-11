@@ -21,8 +21,8 @@ This repository now supports a Linux-first single-GPU workflow for PlantSeg.
 
 - `environment.server.linux.cuda118.yml` is the environment entry point for the server.
 - `requirements.server.txt` is the pip dependency lock for the Linux server target.
-- The environment file explicitly uses `conda-forge` + `nodefaults` so that stale global `defaults` or mirror entries do not leak into the solve.
-- If the server has a custom `.condarc`, prefer `tools/create_server_env.sh`, which disables conda plugins and overrides global channels during environment creation.
+- The environment file explicitly uses `conda-forge` + `nodefaults`.
+- If the server has a custom `.condarc`, use `tools/create_server_env.sh`. The script creates a temporary clean `CONDARC`, disables conda plugins, and prevents stale global mirror entries from leaking into the solve.
 
 ## Training
 
