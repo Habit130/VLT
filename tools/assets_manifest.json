@@ -1,0 +1,10 @@
+{
+  "backbone_weights": {
+    "filename": "yolov3_480000.h5",
+    "url": "https://1drv.ms/u/s!AmrFUyZ_lDVGiHOaFzCO5FL5paqn?e=qwGxvZ",
+    "description": "MCN official DarkNet53-yolov3 Keras backbone weights"
+  },
+  "spacy_model": {
+    "name": "en_core_web_lg"
+  }
+}

@@ -1,9 +1,9 @@
 """YOLO_v3 Model Defined in Keras."""
 
 import tensorflow as tf
-from keras import backend as K
-from keras import layers as L
-from keras.models import Model
+from tensorflow.keras import backend as K
+from tensorflow.keras import layers as L
+from tensorflow.keras.models import Model
 
 from model.language_backbone import build_nlp_model
 from model.transfromer_model import ref_tf, lang_tf_enc
@@ -23,14 +23,14 @@ def simple_fusion(F_v, f_q, dim=1024):
     F_v_proj = V.darknet_resblock(F_v, dim//2)
     # fq_project
     f_q_proj = L.Dense(dim, activation='linear')(f_q)
-    f_q_proj = L.advanced_activations.LeakyReLU(alpha=0.1)(
-        L.normalization.BatchNormalization()(f_q_proj)
+    f_q_proj = L.LeakyReLU(alpha=0.1)(
+        L.BatchNormalization()(f_q_proj)
         )
     f_q_proj = L.Lambda(utils.expand_and_tile, arguments={'outsize': out_size})(f_q_proj)
     # simple elemwise multipy
     F_m = L.Multiply()([F_v_proj, f_q_proj])
-    F_m = L.advanced_activations.LeakyReLU(alpha=0.1)(
-        L.normalization.BatchNormalization()(F_m)
+    F_m = L.LeakyReLU(alpha=0.1)(
+        L.BatchNormalization()(F_m)
         )
     return F_m
 

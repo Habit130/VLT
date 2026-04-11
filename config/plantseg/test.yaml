@@ -1,0 +1,19 @@
+train_set: ./data/data_v2/anns/plantseg/train.json
+evaluate_set: ./data/data_v2/anns/plantseg/test.json
+seg_gt_path: ../plantseg/ann
+image_path: ../plantseg
+pretrained_weights: ./data/weights/yolov3_480000.h5
+log_path: ./log/plantseg
+evaluate_model: ./log/plantseg_train/models/best_map.h5
+
+word_embed: en_core_web_lg
+batch_size: 8
+workers: 1
+max_queue_size: 2
+log_images: 0
+
+transformer_encoder_num: 2
+transformer_decoder_num: 2
+
+num_query: 16
+query_balance: True

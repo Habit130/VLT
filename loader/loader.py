@@ -1,8 +1,9 @@
 import numpy as np
 import cv2
 import os
-import spacy
-import keras
+from tensorflow import keras
+
+from runtime_utils import load_spacy_model
 
 
 class Generator(keras.utils.Sequence):
@@ -21,7 +22,7 @@ class Generator(keras.utils.Sequence):
         self.config = config
         self.train_mode = train_mode
         self.batch_size = config.batch_size
-        self.embed = spacy.load(config.word_embed)
+        self.embed = load_spacy_model(config.word_embed)
         self.input_shape = (config.input_size, config.input_size)
         self.on_epoch_end()
 
@@ -72,7 +73,7 @@ class Generator(keras.utils.Sequence):
         group = self.groups[index]
         image_data, word_data, seg_data = self.get_batch(group)
         # print(np.shape(inputs))
-        return [image_data, word_data, seg_data], np.zeros(self.batch_size)
+        return [image_data, word_data, seg_data], np.zeros(len(group), dtype=np.float32)
 
 
 def qlist_to_vec(max_length, q_list, embed, emb_size=300):

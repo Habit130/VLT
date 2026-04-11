@@ -1,8 +1,8 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
-from keras.callbacks import Callback
-import keras.backend as K
+from tensorflow.keras.callbacks import Callback
+from tensorflow.keras import backend as K
 
 
 class LearningRateScheduler(Callback):
@@ -27,7 +27,10 @@ class LearningRateScheduler(Callback):
     def on_epoch_begin(self, epoch, logs=None):
         self.epoch += 1
         self.lr = self.schedule(self.epoch)
-        K.set_value(self.model.optimizer.lr, self.lr)
+        lr_attr = getattr(self.model.optimizer, 'learning_rate', None)
+        if lr_attr is None:
+            lr_attr = getattr(self.model.optimizer, 'lr')
+        K.set_value(lr_attr, self.lr)
         if self.verbose > 0:
             print('\nEpoch %05d: LearningRateScheduler setting learning '
                   'rate to %.4f' % (self.epoch, self.lr))

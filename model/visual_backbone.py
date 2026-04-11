@@ -1,10 +1,9 @@
 # from keras.layers import Conv2D, Add, ZeroPadding2D, ReLU, UpSampling2D, Flatten, Concatenate, MaxPooling2D, Multiply, Input, Lambda, Dense, Dropout, Dot, Reshape, Activation, GlobalAveragePooling2D, AveragePooling2D
 from functools import reduce
-from keras.layers import Conv2D, Add, ZeroPadding2D, ReLU
-from keras.layers.advanced_activations import LeakyReLU
-from keras.layers.normalization import BatchNormalization
-from keras.regularizers import l2
 from functools import wraps
+
+from tensorflow.keras.layers import Conv2D, Add, ZeroPadding2D, ReLU, LeakyReLU, BatchNormalization
+from tensorflow.keras.regularizers import l2
 
 
 def compose(*funcs):

@@ -12,6 +12,13 @@ Please consider citing our paper in your publications if the project helps your 
 
 ## Introduction
 
+## Server Delivery Note
+
+This repository now also includes a Linux-first single-RTX-4090 delivery path for the PlantSeg dataset.
+
+- The original RefCOCO instructions below are kept as historical reference.
+- The server delivery entrypoints, environment files, asset preparation flow, and PlantSeg workflow are documented in `SERVER.md`.
+
 Vision-Language Transformer (VLT) is a framework for referring segmentation task. Our method produces multiple query vector for one input language expression, and use each of them to “query” the input image, generating a set of responses. Then the network selectively aggregates these responses, in which queries that provide better comprehensions are spotlighted.
 
 <p align="center">

@@ -3,12 +3,12 @@ import os
 from abc import abstractmethod
 from datetime import datetime
 
-import keras
-import keras.backend as K
-from keras.callbacks import ModelCheckpoint, TensorBoard
-from keras.layers import Input, Lambda
-from keras.models import Model
-from keras.optimizers import Adam
+from tensorflow import keras
+from tensorflow.keras import backend as K
+from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
+from tensorflow.keras.layers import Input, Lambda
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import Adam
 
 from callbacks.common import RedirectModel
 from callbacks.eval import Evaluate
@@ -56,11 +56,9 @@ class Executor(object):
         self.load_model(model_body)
 
         if self.GPUS > 1:
-            print("Using {} GPUs".format(self.GPUS))
-            model_body_para = keras.utils.multi_gpu_model(model_body, gpus=self.GPUS)
-        else:
-            print("Using SINGLE GPU Only")
-            model_body_para = model_body
+            print("Multiple GPUs detected, but this delivery is locked to single-GPU execution.")
+        print("Using SINGLE GPU Only")
+        model_body_para = model_body
 
         model_loss = Lambda(yolo_loss,
                             output_shape=(1,),
@@ -76,7 +74,7 @@ class Executor(object):
         return model, model_body_para, model_body
 
     def load_dataset(self, split):
-        with open(self.config[split], 'rb') as f:
+        with open(self.config[split], 'r', encoding='utf-8') as f:
             data_lines = json.load(f)
         if self.debug:
             data_lines = data_lines[:50]
@@ -106,13 +104,15 @@ class Trainer(Executor):
 
         if not os.path.exists(self.model_path):
             os.makedirs(self.model_path)
-        json.dump(config, open(os.path.join(self.model_path, 'config.json'), 'w'))
+        with open(os.path.join(self.model_path, 'config.yaml'), 'w', encoding='utf-8') as f:
+            f.write(config.dump())
 
         timestr = datetime.now().strftime('%m_%d_%H_%M_%S')
         self.tb_path = os.path.join(self.log_path, timestr)
         if not os.path.exists(self.tb_path):
             os.makedirs(self.tb_path)
-        json.dump(config, open(os.path.join(self.tb_path, 'config.json'), 'w'))
+        with open(os.path.join(self.tb_path, 'config.yaml'), 'w', encoding='utf-8') as f:
+            f.write(config.dump())
 
         super(Trainer, self).__init__(config, **kwargs)
 
@@ -160,7 +160,7 @@ class Trainer(Executor):
         # Yolo Compile
         print('Compiling model... ')
         self.yolo_model.compile(loss={'yolo_loss': lambda y_true, y_pred: y_pred},
-                                optimizer=Adam(lr=self.config.lr))
+                                optimizer=Adam(learning_rate=self.config.lr))
 
         if self.config.workers > 0:
             use_multiprocessing = True
@@ -168,15 +168,15 @@ class Trainer(Executor):
             use_multiprocessing = False
 
         print('Starting training:')
-        self.yolo_model.fit_generator(self.train_generator,
-                                      callbacks=self.callbacks,
-                                      epochs=self.config.epoches,
-                                      initial_epoch=self.config.start_epoch,
-                                      verbose=True,
-                                      workers=self.config.workers,
-                                      use_multiprocessing=use_multiprocessing,
-                                      max_queue_size=self.config.max_queue_size
-                                      )
+        self.yolo_model.fit(self.train_generator,
+                            callbacks=self.callbacks,
+                            epochs=self.config.epoches,
+                            initial_epoch=self.config.start_epoch,
+                            verbose=True,
+                            workers=self.config.workers,
+                            use_multiprocessing=use_multiprocessing,
+                            max_queue_size=self.config.max_queue_size
+                            )
 
 
 class Tester(Executor):
@@ -197,8 +197,7 @@ class Tester(Executor):
     def eval(self):
         results = dict()
         self.evaluator.on_epoch_end(-1, results)
-        seg_iou = results['seg_iou']
-        seg_prec = results['seg_prec']
+        seg_metrics = self.evaluator.callback.seg_metrics
         # dump results to text file
         if not os.path.exists('result/'):
             os.mkdir('result/')
@@ -207,10 +206,11 @@ class Tester(Executor):
 
         with open('result/result_%s.txt' % (timestr), 'w') as f_w:
             f_w.write('segmentation result:' + '\n')
-            f_w.write('seg_iou: %.4f\n' % (seg_iou))
-            for item in seg_prec:
-                f_w.write('prec@%.2f: %.4f' % (item, seg_prec[item])+'\n')
+            for metric_name in ['IoU', 'Dice', 'Recall', 'mIoU', 'mACC']:
+                f_w.write('%s: %.4f\n' % (metric_name, seg_metrics[metric_name]))
             f_w.write('\n')
+        with open('result/result_%s.json' % (timestr), 'w', encoding='utf-8') as f_w:
+            json.dump(seg_metrics, f_w, indent=2)
 
 
 class Debugger(Executor):
@@ -235,4 +235,4 @@ class Debugger(Executor):
     def run(self):
         self.yolo_model.summary()
         self.yolo_model.compile(loss={'yolo_loss': lambda y_true, y_pred: y_pred},
-                                optimizer=Adam(lr=self.config.lr))
+                                optimizer=Adam(learning_rate=self.config.lr))
