@@ -24,6 +24,7 @@ if not args.verbose:
     tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 tf.compat.v1.disable_eager_execution()
+tf.compat.v1.experimental.output_all_intermediates(True)
 
 with open('config/base.yaml', 'r') as f:
     _C = CN.load_cfg(f)
