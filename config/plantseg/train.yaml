@@ -8,7 +8,7 @@ evaluate_model: ./log/plantseg_train/models/best_map.h5
 
 word_embed: en_core_web_lg
 epoches: 50
-batch_size: 8
+batch_size: 2
 workers: 0
 max_queue_size: 1
 

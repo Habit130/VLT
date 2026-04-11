@@ -49,10 +49,10 @@ class Generator(keras.utils.Sequence):
 
     def get_batch(self, datas):
         size = len(datas)
-        image_data = np.empty([size, self.input_shape[0], self.input_shape[1], 3])
-        word_data = np.empty([size, self.config.word_len, self.config.embed_dim])
+        image_data = np.empty([size, self.input_shape[0], self.input_shape[1], 3], dtype=np.float32)
+        word_data = np.empty([size, self.config.word_len, self.config.embed_dim], dtype=np.float32)
         seg_data = np.empty([size, self.input_shape[0] // self.config.seg_out_stride,
-                             self.input_shape[1] // self.config.seg_out_stride, 1])
+                             self.input_shape[1] // self.config.seg_out_stride, 1], dtype=np.float32)
         for (i, data) in enumerate(datas):
             image, word_vec, seg_map = get_random_data(data,
                                                        self.input_shape,
@@ -82,7 +82,7 @@ def qlist_to_vec(max_length, q_list, embed, emb_size=300):
     use for process sentences
     '''
     q_list = q_list.split()
-    glove_matrix = np.zeros((max_length, emb_size), dtype=float)
+    glove_matrix = np.zeros((max_length, emb_size), dtype=np.float32)
     q_len = min(max_length, len(q_list))
 
     for i in range(q_len):
@@ -114,19 +114,19 @@ def get_random_data(ref, input_shape, embed, config, train_mode=True, max_boxes=
     dy = (h - nh) // 2
 
     image = cv2.resize(image, (nw, nh), interpolation=cv2.INTER_CUBIC)
-    image_data = np.full((w, h, 3), (0.5, 0.5, 0.5))
+    image_data = np.full((w, h, 3), (0.5, 0.5, 0.5), dtype=np.float32)
     image_data[dy:dy+nh, dx:dx+nw, :] = image / 255.
 
     seg_map = cv2.imread(os.path.join(SEG_DIR, str(seg_id)+'.png'), flags=cv2.IMREAD_GRAYSCALE)
     if train_mode:
         seg_map = cv2.resize(seg_map, (nw, nh), interpolation=cv2.INTER_CUBIC)
-        seg_map_data = np.zeros((w, h))
+        seg_map_data = np.zeros((w, h), dtype=np.float32)
         seg_map_data[dy:dy+nh, dx:dx+nw] = seg_map / 255
         seg_map_data = cv2.resize(seg_map_data, (
             w // config.seg_out_stride, h // config.seg_out_stride), interpolation=cv2.INTER_NEAREST)
-        seg_map_data = seg_map_data[:, :, None]
+        seg_map_data = seg_map_data[:, :, None].astype(np.float32)
 
     if not train_mode:
         word_vec = [qlist_to_vec(config.word_len, sent['sent'], embed) for sent in sentences]
-        return image_data, word_vec, ori_image, sentences, seg_map[:, :, None]
+        return image_data.astype(np.float32), word_vec, ori_image, sentences, seg_map[:, :, None]
     return image_data, word_vec, seg_map_data
