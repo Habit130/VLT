@@ -47,23 +47,22 @@ def concat_coord(x):
     batch_size = tf.shape(x)[0]
     h = tf.shape(x)[1]
     w = tf.shape(x)[2]
-    float_h = K.cast(h, 'float32')
-    float_w = K.cast(w, 'float32')
+    float_h = tf.cast(h, tf.float32)
+    float_w = tf.cast(w, tf.float32)
 
-    y_range = K.arange(float_h, dtype='float32')     # [h, ]
-    y_range = 2.0 * y_range / (float_h - 1.0) - 1.0
-    x_range = K.arange(float_w, dtype='float32')     # [w, ]
-    x_range = 2.0 * x_range / (float_w - 1.0) - 1.0
-    x_range = x_range[None, :]   # [1, w]
-    y_range = y_range[:, None]   # [h, 1]
-    x = K.tile(x_range, [h, 1])     # [h, w]
-    y = K.tile(y_range, [1, w])     # [h, w]
+    y_range = tf.range(h, dtype=tf.float32)
+    x_range = tf.range(w, dtype=tf.float32)
+    y_range = 2.0 * y_range / tf.maximum(float_h - 1.0, 1.0) - 1.0
+    x_range = 2.0 * x_range / tf.maximum(float_w - 1.0, 1.0) - 1.0
 
-    x = x[None, :, :, None]   # [1, h, w, 1]
-    y = y[None, :, :, None]   # [1, h, w, 1]
-    x = K.tile(x, [batch_size, 1, 1, 1])   # [N, h, w, 1]
-    y = K.tile(y, [batch_size, 1, 1, 1])   # [N, h, w, 1]
+    x_coords = tf.tile(x_range[tf.newaxis, :], [h, 1])
+    y_coords = tf.tile(y_range[:, tf.newaxis], [1, w])
 
-    ins_feat_out = K.concatenate([ins_feat, x, x, x, y, y, y])   # [N, h, w, c+6]
+    x_coords = x_coords[tf.newaxis, :, :, tf.newaxis]
+    y_coords = y_coords[tf.newaxis, :, :, tf.newaxis]
+    x_coords = tf.tile(x_coords, [batch_size, 1, 1, 1])
+    y_coords = tf.tile(y_coords, [batch_size, 1, 1, 1])
+
+    ins_feat_out = tf.concat([ins_feat, x_coords, x_coords, x_coords, y_coords, y_coords, y_coords], axis=-1)
 
     return ins_feat_out

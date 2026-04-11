@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import subprocess
 import sys
 from html import unescape
 from pathlib import Path
-from urllib.parse import urljoin
 from urllib.request import Request, urlopen
 
 
@@ -55,10 +53,7 @@ def download_file(url: str, destination: Path) -> None:
 
 
 def ensure_spacy_model(model_name: str) -> None:
-    subprocess.run(
-        [sys.executable, "-m", "spacy", "download", model_name],
-        check=True,
-    )
+    subprocess.run([sys.executable, "-m", "spacy", "download", model_name], check=True)
 
 
 def main() -> None:
